@@ -1,246 +1,1 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Editor de Video - [TU NOMBRE]</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      text-align: center;
-      padding: 20px;
-      min-height: 100vh;
-    }
-    .container {
-      max-width: 900px;
-      margin: 40px auto;
-      background: rgba(255,255,255,0.1);
-      padding: 30px;
-      border-radius: 20px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    h1 { font-size: 2.5em; margin-bottom: 10px; }
-    p { font-size: 1.1em; margin-bottom: 20px; opacity: 0.9; }
-    .upload-area {
-      border: 3px dashed rgba(255,255,255,0.5);
-      border-radius: 15px;
-      padding: 30px;
-      margin: 20px 0;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    .upload-area:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
-    .upload-area.dragover { background: rgba(255,255,255,0.2); transform: scale(1.02); }
-    video {
-      width: 100%;
-      max-width: 800px;
-      margin: 25px auto;
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-    }
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-      margin: 20px 0;
-    }
-    button {
-      padding: 14px 24px;
-      font-size: 16px;
-      font-weight: bold;
-      background: #ff6b6b;
-      color: white;
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      transition: 0.3s;
-      min-width: 160px;
-    }
-    button:hover { background: #ff5252; transform: translateY(-3px); box-shadow: 0 5px 15px rgba(255,107,107,0.4); }
-    .time-inputs {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-      margin: 20px 0;
-      flex-wrap: wrap;
-    }
-    input[type="number"] {
-      padding: 12px;
-      width: 100px;
-      border-radius: 10px;
-      border: none;
-      font-size: 16px;
-      text-align: center;
-    }
-    .footer {
-      margin-top: 40px;
-      font-size: 0.9em;
-      opacity: 0.7;
-    }
-    @media (max-width: 600px) {
-      h1 { font-size: 2em; }
-      .controls { flex-direction: column; align-items: center; }
-    }
-  </style>
-</head>
-<body>
-
-  <div class="container">
-    <h1>Editor de Video - [TU NOMBRE]</h1>
-    <p>Sube, recorta y descarga tu video en segundos. ¡Gratis y sin marcas de agua!</p>
-
-    <div class="upload-area" id="dropZone">
-      <p>Arrastra tu video aquí o haz clic para subir</p>
-      <input type="file" id="videoInput" accept="video/*" hidden />
-    </div>
-
-    <video id="videoPreview" controls></video>
-
-    <div class="time-inputs">
-      <div>
-        <label>Desde (seg):</label><br>
-        <input type="number" id="startTime" min="0" step="0.1" value="0" />
-      </div>
-      <div>
-        <label>Hasta (seg):</label><br>
-        <input type="number" id="endTime" min="0" step="0.1" value="30" />
-      </div>
-    </div>
-
-    <div class="controls">
-      <button onclick="aplicarCorte()">Cortar Video</button>
-      <button onclick="descargarVideo()">Descargar</button>
-      <button onclick="resetear()">Reiniciar</button>
-    </div>
-
-    <div class="footer">
-      Hecho con ❤️ por <strong>[TU NOMBRE]</strong> | Editor profesional para YouTube y Facebook
-    </div>
-  </div>
-
-  <script>
-    const videoInput = document.getElementById('videoInput');
-    const videoPreview = document.getElementById('videoPreview');
-    const dropZone = document.getElementById('dropZone');
-    const startTime = document.getElementById('startTime');
-    const endTime = document.getElementById('endTime');
-
-    let videoFile, videoURL, mediaRecorder, recordedChunks = [];
-
-    // Abrir selector al hacer clic
-    dropZone.addEventListener('click', () => videoInput.click());
-
-    // Drag & Drop
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-    });
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-    });
-
-    dropZone.addEventListener('drop', handleDrop);
-    videoInput.addEventListener('change', handleFiles);
-
-    function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      handleFiles({ target: { files } });
-    }
-
-    function handleFiles(e) {
-      videoFile = e.target.files[0];
-      if (videoFile && videoFile.type.startsWith('video/')) {
-        videoURL = URL.createObjectURL(videoFile);
-        videoPreview.src = videoURL;
-        videoPreview.style.display = 'block';
-      }
-    }
-
-    function aplicarCorte() {
-      const start = parseFloat(startTime.value);
-      const end = parseFloat(endTime.value);
-      if (!videoFile || isNaN(start) || isNaN(end)) {
-        alert("Por favor, sube un video y define los tiempos.");
-        return;
-      }
-      videoPreview.currentTime = start;
-      alert(`Reproduciendo desde ${start}s hasta ${end}s. Haz clic en "Descargar" para guardar.`);
-    }
-
-    async function descargarVideo() {
-      if (!videoFile) return alert("Primero sube un video");
-
-      const start = parseFloat(startTime.value) || 0;
-      const end = parseFloat(endTime.value) || videoPreview.duration;
-
-      // Usamos FFmpeg.wasm para cortar (carga solo cuando se necesita)
-      if (!window.ffmpegLoaded) {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
-        document.body.appendChild(script);
-        script.onload = () => cortarConFFmpeg(start, end);
-        window.ffmpegLoaded = true;
-      } else {
-        cortarConFFmpeg(start, end);
-      }
-    }
-
-    function cortarConFFmpeg(start, end) {
-      if (!window.FFmpeg) return alert("Cargando editor... espera un momento");
-
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({ log: false });
-      
-      (async () => {
-        if (!ffmpeg.isLoaded()) await ffmpeg.load();
-
-        const inputName = 'input.mp4';
-        const outputName = `editado_${Date.now()}.mp4`;
-        ffmpeg.FS('writeFile', inputName, await fetchFile(videoFile));
-
-        await ffmpeg.run(
-          '-i', inputName,
-          '-ss', start.toString(),
-          '-to', end.toString(),
-          '-c', 'copy',
-          outputName
-        );
-
-        const data = ffmpeg.FS('readFile', outputName);
-        const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = outputName;
-        a.click();
-
-        ffmpeg.FS('unlink', inputName);
-        ffmpeg.FS('unlink', outputName);
-        URL.revokeObjectURL(url);
-      })();
-    }
-
-    function resetear() {
-      videoPreview.src = '';
-      videoPreview.style.display = 'none';
-      videoInput.value = '';
-      startTime.value = 0;
-      endTime.value = 30;
-      recordedChunks = [];
-    }
-  </script>
-
-</body>
-</html>
+<!DOCTYPE html><html lang="es"><head>  <meta charset="UTF-8" />  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>  <title>David's Video Cutter</title>  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">  <style>    * { margin: 0; padding: 0; box-sizing: border-box; }    body {      font-family: 'Poppins', sans-serif;      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);      color: white;      text-align: center;      padding: 20px;      min-height: 100vh;    }    .container {      max-width: 900px;      margin: 40px auto;      background: rgba(255,255,255,0.1);      padding: 30px;      border-radius: 20px;      backdrop-filter: blur(10px);      box-shadow: 0 10px 30px rgba(0,0,0,0.3);    }    h1 { font-size: 2.5em; margin-bottom: 10px; }    p { font-size: 1.1em; margin-bottom: 20px; opacity: 0.9; }    .upload-area {      border: 3px dashed rgba(255,255,255,0.5);      border-radius: 15px;      padding: 30px;      margin: 20px 0;      cursor: pointer;      transition: 0.3s;    }    .upload-area:hover { border-color: #fff; background: rgba(255,255,255,0.1); }    .upload-area.dragover { background: rgba(255,255,255,0.2); transform: scale(1.02); }    video {      width: 100%;      max-width: 800px;      margin: 25px auto;      border-radius: 12px;      box-shadow: 0 8px 20px rgba(0,0,0,0.3);    }    .controls {      display: flex;      flex-wrap: wrap;      gap: 12px;      justify-content: center;      margin: 20px 0;    }    button {      padding: 14px 24px;      font-size: 16px;      font-weight: bold;      background: #ff6b6b;      color: white;      border: none;      border-radius: 50px;      cursor: pointer;      transition: 0.3s;      min-width: 160px;    }    button:hover { background: #ff5252; transform: translateY(-3px); box-shadow: 0 5px 15px rgba(255,107,107,0.4); }    .time-inputs {      display: flex;      gap: 15px;      justify-content: center;      margin: 20px 0;      flex-wrap: wrap;    }    input[type="number"] {      padding: 12px;      width: 100px;      border-radius: 10px;      border: none;      font-size: 16px;      text-align: center;    }    .footer {      margin-top: 40px;      font-size: 0.9em;      opacity: 0.7;    }    @media (max-width: 600px) {      h1 { font-size: 2em; }      .controls { flex-direction: column; align-items: center; }    }  </style></head><body><div class="container">    <h1>David's Video Cutter</h1>    <p>Sube, recorta y descarga tu video en segundos. ¡Gratis, rápido y sin marcas de agua!</p>    <div class="upload-area" id="dropZone">      <p>Arrastra tu video aquí o haz clic para subir</p>      <input type="file" id="videoInput" accept="video/*" hidden />    </div>    <video id="videoPreview" controls style="display:none;"></video>    <div class="time-inputs">      <div>        <label>Desde (seg):</label><br>        <input type="number" id="startTime" min="0" step="0.1" value="0" />      </div>      <div>        <label>Hasta (seg):</label><br>        <input type="number" id="endTime" min="0" step="0.1" value="30" />      </div>    </div>    <div class="controls">      <button onclick="aplicarCorte()">Cortar Video</button>      <button onclick="descargarVideo()">Descargar</button>      <button onclick="resetear()">Reiniciar</button>    </div>    <div class="footer">      Hecho con ❤️ por <strong>David</strong> | Editor profesional para YouTube y Facebook    </div></div><script>    const videoInput = document.getElementById('videoInput');    const videoPreview = document.getElementById('videoPreview');    const dropZone = document.getElementById('dropZone');    const startTime = document.getElementById('startTime');    const endTime = document.getElementById('endTime');    let videoFile, videoURL, mediaRecorder, recordedChunks = [];    // Abrir selector al hacer clic    dropZone.addEventListener('click', () => videoInput.click());    // Drag & Drop    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {      dropZone.addEventListener(eventName, preventDefaults, false);    });    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }    ['dragenter', 'dragover'].forEach(eventName => {      dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);    });    ['dragleave', 'drop'].forEach(eventName => {      dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);    });    dropZone.addEventListener('drop', handleDrop);    videoInput.addEventListener('change', handleFiles);    function handleDrop(e) {      const dt = e.dataTransfer;      const files = dt.files;      handleFiles({ target: { files } });    }    function handleFiles(e) {      videoFile = e.target.files[0];      if (videoFile && videoFile.type.startsWith('video/')) {        videoURL = URL.createObjectURL(videoFile);        videoPreview.src = videoURL;        videoPreview.style.display = 'block';        endTime.value = Math.floor(videoPreview.duration) || 30;      }    }    function aplicarCorte() {      const start = parseFloat(startTime.value);      const end = parseFloat(endTime.value);      if (!videoFile || isNaN(start) || isNaN(end)) {        alert("Por favor, sube un video y define los tiempos.");        return;      }      videoPreview.currentTime = start;      alert(`Reproduciendo desde ${start}s hasta ${end}s. Haz clic en "Descargar" para guardar el corte.`);    }    async function descargarVideo() {      if (!videoFile) return alert("Primero sube un video");      const start = parseFloat(startTime.value) || 0;      const end = parseFloat(endTime.value) || videoPreview.duration;      if (!window.ffmpegLoaded) {        const script = document.createElement('script');        script.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';        document.body.appendChild(script);        script.onload = () => cortarConFFmpeg(start, end);        window.ffmpegLoaded = true;        alert("Cargando editor avanzado... (solo la primera vez)");      } else {        cortarConFFmpeg(start, end);      }    }    function cortarConFFmpeg(start, end) {      if (!window.FFmpeg) return alert("Cargando... espera un momento");      const { createFFmpeg, fetchFile } = FFmpeg;      const ffmpeg = createFFmpeg({ log: false });            (async () => {        if (!ffmpeg.isLoaded()) await ffmpeg.load();        const inputName = 'input.mp4';        const outputName = `corte_david_${Date.now()}.mp4`;        ffmpeg.FS('writeFile', inputName, await fetchFile(videoFile));        await ffmpeg.run(          '-i', inputName,          '-ss', start.toString(),          '-to', end.toString(),          '-c', 'copy',          '-avoid_negative_ts', 'make_zero',          outputName        );        const data = ffmpeg.FS('readFile', outputName);        const blob = new Blob([data.buffer], { type: 'video/mp4' });        const url = URL.createObjectURL(blob);        const a = document.createElement('a');        a.href = url;        a.download = outputName;        a.click();        ffmpeg.FS('unlink', inputName);        ffmpeg.FS('unlink', outputName);        URL.revokeObjectURL(url);      })();    }    function resetear() {      videoPreview.src = '';      videoPreview.style.display = 'none';      videoInput.value = '';      startTime.value = 0;      endTime.value = 30;      recordedChunks = [];    }</body></html>
